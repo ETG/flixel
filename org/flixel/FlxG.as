@@ -979,13 +979,19 @@ package org.flixel
 		 * Pass "null" or no parameter to use the system cursor.
 		 * 
 		 * @param	CursorGraphic	The image you want to use for the cursor.
+		 * @param	HotspotX	The horizontal offset for the cursor image.
+		 * @param	HotspotY	The vertical offset for the cursor image.
 		 */
-		static public function showCursor(CursorGraphic:Class=null):void
+		static public function showCursor(CursorGraphic:Class=null, HotspotX:int = 0, HotspotY:int = 0):void
 		{
 			if(CursorGraphic == null)
 				_game._cursor = _game._buffer.addChild(new ImgDefaultCursor) as Bitmap;
 			else
+			{
 				_game._cursor = _game._buffer.addChild(new CursorGraphic) as Bitmap;
+				_game._cursorHotspot.x = HotspotX;
+				_game._cursorHotspot.y = HotspotY;
+			}
 		}
 		
 		/**

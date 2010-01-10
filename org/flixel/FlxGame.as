@@ -69,6 +69,7 @@ package org.flixel
 		internal var _frame:Class;
 		internal var _curState:FlxState;
 		internal var _cursor:Bitmap;
+		internal var _cursorHotspot:Point;
 		
 		//basic update stuff
 		internal var _elapsed:Number;
@@ -121,6 +122,8 @@ package org.flixel
 			_iState = InitialState;
 
 			_panel = new FlxPanel();
+			
+			_cursorHotspot = new Point();
 			
 			useDefaultHotKeys = true;
 			
@@ -374,8 +377,8 @@ package org.flixel
 				FlxG.updateInput();
 				if(_cursor != null)
 				{
-					_cursor.x = FlxG.mouse.x+FlxG.scroll.x;
-					_cursor.y = FlxG.mouse.y+FlxG.scroll.y;
+					_cursor.x = FlxG.mouse.x+FlxG.scroll.x - _cursorHotspot.x;
+					_cursor.y = FlxG.mouse.y+FlxG.scroll.y - _cursorHotspot.x;
 				}
 				FlxG.updateSounds();
 				if(_paused)
