@@ -48,6 +48,14 @@ package org.flixel
 		 * Set this flag to use one of the 16-tile binary auto-tile algorithms (OFF, AUTO, or ALT).
 		 */
 		public var auto:uint;
+		/**
+		 * Setting this to true will cause every other row to be offseted by half a tile width.
+		 */
+		public var oddRowOffset:Boolean;
+		/**
+		 * How much do the tiles overlap. Usefull for non-square tiles.
+		 */
+		public var tileOverlap:Point;
 		
 		/**
 		 * Read-only variable, do NOT recommend changing after the map is loaded!
@@ -86,6 +94,8 @@ package org.flixel
 			widthInTiles = 0;
 			heightInTiles = 0;
 			totalTiles = 0;
+			oddRowOffset = false;
+			tileOverlap = new Point();
 			_data = new Array();
 			_p = new Point();
 			_tileWidth = 0;
@@ -108,8 +118,13 @@ package org.flixel
 		 * 
 		 * @return	A pointer this instance of FlxTilemap, for chaining as usual :)
 		 */
-		public function loadMap(MapData:String, TileGraphic:Class, TileWidth:uint=0, TileHeight:uint=0):FlxTilemap
+		public function loadMap(MapData:String, TileGraphic:Class, TileWidth:uint=0, TileHeight:uint=0, Overlap:Point=null):FlxTilemap
 		{
+			// Set tileOffset
+			if (Overlap == null)
+				tileOverlap = new Point();
+			else tileOverlap = Overlap.clone();
+			
 			//Figure out the map dimensions based on the data string
 			var c:uint;
 			var cols:Array;
@@ -158,10 +173,10 @@ package org.flixel
 				updateTile(i);
 
 			//Pre-set some helper variables for later
-			_screenRows = Math.ceil(FlxG.height/_tileHeight)+1;
+			_screenRows = Math.ceil(FlxG.height/(_tileHeight -tileOverlap.y))+2;
 			if(_screenRows > heightInTiles)
 				_screenRows = heightInTiles;
-			_screenCols = Math.ceil(FlxG.width/_tileWidth)+1;
+			_screenCols = Math.ceil(FlxG.width/(_tileWidth -tileOverlap.x))+2;
 			if(_screenCols > widthInTiles)
 				_screenCols = widthInTiles;
 			
@@ -175,16 +190,21 @@ package org.flixel
 		{
 			super.render();
 			getScreenXY(_p);
-			var tx:int = Math.floor(-_p.x/_tileWidth);
-			var ty:int = Math.floor(-_p.y/_tileHeight);
+			var tx:int = Math.floor(-_p.x/(_tileWidth -tileOverlap.x)) -1;
+			var ty:int = Math.floor(-_p.y/(_tileHeight -tileOverlap.y) -1);
 			if(tx < 0) tx = 0;
 			if(tx > widthInTiles-_screenCols) tx = widthInTiles-_screenCols;
 			if(ty < 0) ty = 0;
 			if(ty > heightInTiles-_screenRows) ty = heightInTiles-_screenRows;
 			var ri:int = ty*widthInTiles+tx;
-			_p.x += tx*_tileWidth;
-			_p.y += ty*_tileHeight;
+			_p.x += tx*(_tileWidth -tileOverlap.x);
+			_p.y += ty*(_tileHeight -tileOverlap.y);
 			var opx:int = _p.x;
+			
+			var shiftRow:Boolean = (ty & 1 == 1)? true : false;
+				if (oddRowOffset && shiftRow)
+					_p.x += (_tileWidth -tileOverlap.x) >> 1;
+			
 			var c:uint;
 			var cri:uint;
 			for(var r:uint = 0; r < _screenRows; r++)
@@ -195,11 +215,14 @@ package org.flixel
 					if(_rects[cri] != null)
 						FlxG.buffer.copyPixels(_pixels,_rects[cri],_p,null,null,true);
 					cri++;
-					_p.x += _tileWidth;
+					_p.x += _tileWidth -tileOverlap.x;
 				}
 				ri += widthInTiles;
 				_p.x = opx;
-				_p.y += _tileHeight;
+				shiftRow = !shiftRow;
+				if (oddRowOffset && shiftRow)
+					_p.x += (_tileWidth - tileOverlap.x) >> 1;
+				_p.y += _tileHeight -tileOverlap.y;
 			}
 		}
 		
@@ -217,10 +240,10 @@ package org.flixel
 			var blocks:Array = new Array();
 			
 			//First make a list of all the blocks we'll use for collision
-			var ix:uint = Math.floor((Core.x - x)/_tileWidth);
-			var iy:uint = Math.floor((Core.y - y)/_tileHeight);
-			var iw:uint = Math.ceil(Core.width/_tileWidth)+1;
-			var ih:uint = Math.ceil(Core.height/_tileHeight)+1;
+			var ix:uint = Math.floor((Core.x - x)/(_tileWidth - tileOverlap.x));
+			var iy:uint = Math.floor((Core.y - y)/(_tileHeight - tileOverlap.y));
+			var iw:uint = Math.ceil(Core.width/(_tileWidth - tileOverlap.x))+1;
+			var ih:uint = Math.ceil(Core.height/(_tileHeight - tileOverlap.y))+1;
 			for(var r:uint = 0; r < ih; r++)
 			{
 				if((r < 0) || (r >= heightInTiles)) break;
@@ -229,8 +252,11 @@ package org.flixel
 				{
 					if((c < 0) || (c >= widthInTiles)) break;
 					dd = _data[d+c];
-					if(dd >= collideIndex)
-						blocks.push({x:x+(ix+c)*_tileWidth,y:y+(iy+r)*_tileHeight,data:dd});
+					if (dd >= collideIndex)
+						if (oddRowOffset && ((iy+r) & 1 == 1))
+							blocks.push({x:x+(ix+c)*(_tileWidth - tileOverlap.x) + ((_tileWidth -tileOverlap.x) >> 1),y:y+(iy+r)*(_tileHeight - tileOverlap.y),data:dd});
+						else
+							blocks.push({x:x+(ix+c)*(_tileWidth - tileOverlap.x),y:y+(iy+r)*(_tileHeight - tileOverlap.y),data:dd});
 				}
 			}
 			
@@ -261,10 +287,10 @@ package org.flixel
 			var blocks:Array = new Array();
 			
 			//First make a list of all the blocks we'll use for collision
-			var ix:uint = Math.floor((Core.x - x)/_tileWidth);
-			var iy:uint = Math.floor((Core.y - y)/_tileHeight);
-			var iw:uint = Math.ceil(Core.width/_tileWidth)+1;
-			var ih:uint = Math.ceil(Core.height/_tileHeight)+1;
+			var ix:uint = Math.floor((Core.x - x)/(_tileWidth - tileOverlap.x));
+			var iy:uint = Math.floor((Core.y - y)/(_tileHeight - tileOverlap.y));
+			var iw:uint = Math.ceil(Core.width/(_tileWidth - tileOverlap.x))+1;
+			var ih:uint = Math.ceil(Core.height/(_tileHeight - tileOverlap.y))+1;
 			for(var r:uint = 0; r < ih; r++)
 			{
 				if((r < 0) || (r >= heightInTiles)) break;
@@ -274,7 +300,10 @@ package org.flixel
 					if((c < 0) || (c >= widthInTiles)) break;
 					dd = _data[d+c];
 					if(dd >= collideIndex)
-						blocks.push({x:x+(ix+c)*_tileWidth,y:y+(iy+r)*_tileHeight,data:dd});
+						if (oddRowOffset && ((iy+r) & 1 == 1))
+							blocks.push({x:x+(ix+c)*(_tileWidth - tileOverlap.x) + ((_tileWidth -tileOverlap.x) >> 1),y:y+(iy+r)*(_tileHeight - tileOverlap.y),data:dd});
+						else
+							blocks.push({x:x+(ix+c)*(_tileWidth - tileOverlap.x),y:y+(iy+r)*(_tileHeight - tileOverlap.y),data:dd});
 				}
 			}
 			
@@ -631,7 +660,7 @@ package org.flixel
 			if(rx >= _pixels.width)
 			{
 				ry = uint(rx/_pixels.width)*_tileHeight;
-				rx %= _pixels.width;
+				rx %= _pixels.width;				
 			}
 			_rects[Index] = (new Rectangle(rx,ry,_tileWidth,_tileHeight));
 		}
